@@ -1,0 +1,25 @@
+[package]
+name = "cur-rs"
+version = "0.1.0"
+edition = "2018"
+
+[[bin]]
+name = "cur"
+path = "src/main.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[profile.dev]
+opt-level = 3
+
+[dependencies]
+attohttpc = "0.17.0"
+#curl = "0.4.39"
+#ureq = "2.2.0"
+xml-rs = "0.8"
+#pickledb = "0.4.1"
+sled = "0.34.7"
+
+[dependencies.chrono]
+version = "0.4.19"
+default-features = false
+features = [ "clock" ]
