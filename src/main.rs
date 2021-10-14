@@ -109,6 +109,7 @@ fn parse_xml(raw_xml: String) -> (String, HashMap<String, f64>) {
     let xml = EventReader::from_str(raw_xml.as_str());
     let mut time = String::new();
     let mut currencies = HashMap::new();
+    currencies.insert(String::from("EUR"), 1.0);
     for e in xml {
         match e {
             Ok(XmlEvent::StartElement {
@@ -169,6 +170,7 @@ fn is_connector(s: &String) -> bool {
 // This function dreams of being replaced by a compile time constant hashmap
 fn is_currency(s: &String) -> bool {
     return match s.to_uppercase().as_str() {
+        "EUR" => true,
         "HKD" => true,
         "THB" => true,
         "ISK" => true,
