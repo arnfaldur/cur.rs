@@ -15,87 +15,108 @@ use xml::{
 };
 
 fn main() {
-    let debug = false;
     let args = std::env::args().skip(1);
     let types: Vec<ArgType> = args.map(what_is).collect();
 
     use ArgType::*;
-    let correct_usage = match &types[..] {
-        [Currency(curr_a), Currency(curr_b)] | [Currency(curr_a), Connector, Currency(curr_b)] => {
-            Some((1.0, (curr_a, curr_b)))
-        }
-        [Currency(curr_a), Currency(curr_b), Amount(n)]
-        | [Amount(n), Currency(curr_a), Currency(curr_b)]
-        | [Currency(curr_a), Connector, Currency(curr_b), Amount(n)]
-        | [Amount(n), Currency(curr_a), Connector, Currency(curr_b)] => {
-            Some((*n, (curr_a, curr_b)))
-        }
-        _ => None,
-    };
-    if let Some((amount, currency_pair)) = correct_usage {
-        let mut path = temp_dir();
-        // TODO: ensure that this file is unique
-        path.push("cur-rs-data.xml");
-        let mut file = File::open(path.clone());
-        let mut xml = match file {
-            Ok(mut file) => {
-                if debug {
-                    println!("Reading xml from file");
-                }
-                let mut xml = String::new();
-                file.read_to_string(&mut xml);
-                // check if file is up to date
-                xml
-            }
-            Err(e) => {
-                eprintln!("File::open error: {:?}", e);
-                let mut file = File::create(path.clone());
-                match file {
-                    Ok(mut file) => {
-                        if debug {
-                            println!("File not found, fetching xml and saving to file");
-                        }
-                        let xml = get_xml();
-                        file.write_all(xml.as_bytes())
-                            .unwrap_or_else(|err| panic!("Unable to write to file: {}", err));
-                        // get data and put in file
-                        xml
-                    }
-                    Err(e) => {
-                        panic!("Error unable to open file {}", e);
-                    }
-                }
-            }
-        };
-        let (time, currencies) = parse_xml(xml);
-        let time = NaiveDate::parse_from_str(&time, "%Y-%m-%d")
-            .unwrap_or_else(|e| panic!("Error: unable to parse time from xml, time: {}", e))
-            .and_hms(0, 0, 0)
-            .into();
-        if DateTime::<Utc>::from_utc(time, Utc) < Utc::now() - Duration::days(2) {
-            xml = get_xml();
-            if let Ok(mut file) = File::with_options().write(true).open(path) {
-                file.write(xml.as_bytes())
-                    .unwrap_or_else(|e| panic!("Error: unable to write xml to file."));
-            } else {
-                panic!("Error: unable to open file to write to.");
-            }
-        } else {
-            if debug {
-                println!("File is fresh");
-            }
-        }
-
-        let other_amount = amount * currencies[currency_pair.1] / currencies[currency_pair.0];
-        println!(
-            "{:.2} {} is {:.2} {}",
-            amount, currency_pair.0, other_amount, currency_pair.1
-        );
-
-        //println!("xml: {}", xml);
+    if let Some(Help) = types.get(0) {
+        println!(concat!(
+            "usage:\n",
+            "\tcur <option>\n",
+            "\tcur [amount] <from currency> [connector] <to currency>\n",
+            "\tcur <from currency> [connector] <to currency> [amount]\n",
+            "options:\n",
+            "\t-h, --help                      Print this help message\n",
+            "\t-l, -c, --list, --currencies    List the available currency symbols\n",
+            "connectors:\n",
+            "\tas, in, to\n",
+        ));
+    } else if let Some(Currencies) = types.get(0) {
+        // TODO: This shouldn't be hardcoded
+        println!(concat!(
+            "EUR\n", "HKD\n", "THB\n", "ISK\n", "MXN\n", "AUD\n", "RUB\n", "TRY\n", "ZAR\n",
+            "NZD\n", "BRL\n", "CZK\n", "JPY\n", "GBP\n", "CNY\n", "USD\n", "SEK\n", "RON\n",
+            "BGN\n", "ILS\n", "INR\n", "DKK\n", "CAD\n", "CHF\n", "PLN\n", "PHP\n", "MYR\n",
+            "SGD\n", "IDR\n", "NOK\n", "HUF\n", "HRK\n", "KRW\n",
+        ));
     } else {
-        println!("Incorrect usage!");
+        let correct_usage = match &types[..] {
+            //[Invalid, Invalid] => {}
+            [Currency(curr_a), Currency(curr_b)]
+            | [Currency(curr_a), Connector, Currency(curr_b)] => Some((1.0, (curr_a, curr_b))),
+            [Currency(curr_a), Currency(curr_b), Amount(n)]
+            | [Currency(curr_a), Connector, Currency(curr_b), Amount(n)]
+            | [Amount(n), Currency(curr_a), Currency(curr_b)]
+            | [Amount(n), Currency(curr_a), Connector, Currency(curr_b)] => {
+                Some((*n, (curr_a, curr_b)))
+            }
+            _ => None,
+        };
+        if let Some((amount, currency_pair)) = correct_usage {
+            let currencies = fun_name();
+
+            let other_amount = amount * currencies[currency_pair.1] / currencies[currency_pair.0];
+            println!(
+                "{:.2} {} is {:.2} {}",
+                amount, currency_pair.0, other_amount, currency_pair.1
+            );
+        } else {
+            println!("cur: incorrect usage\nTry 'cur -h' for more information.");
+        }
     }
+}
+
+fn fun_name() -> HashMap<String, f64> {
+    let mut path = temp_dir();
+    path.push("cur-rs-data.xml");
+    let mut file = File::open(path.clone());
+    let mut xml = match file {
+        Ok(mut file) => {
+            if cfg!(debug_assertions) {
+                println!("Reading xml from file");
+            }
+            // check if file is up to date
+            let mut xml = String::new();
+            file.read_to_string(&mut xml);
+            xml
+        }
+        Err(e) => {
+            //eprintln!("File::open error: {:?}", e);
+            let mut file = File::create(path.clone());
+            match file {
+                Ok(mut file) => {
+                    if cfg!(debug_assertions) {
+                        println!("File not found, fetching xml and saving to file");
+                    }
+                    // get data and put in file
+                    let xml = get_xml();
+                    file.write_all(xml.as_bytes())
+                        .unwrap_or_else(|err| panic!("Unable to write to file: {}", err));
+                    xml
+                }
+                Err(e) => {
+                    panic!("Error unable to open file {}", e);
+                }
+            }
+        }
+    };
+    let (time, currencies) = parse_xml(xml);
+    let time = NaiveDate::parse_from_str(&time, "%Y-%m-%d")
+        .unwrap_or_else(|e| panic!("Error: unable to parse time from xml, time: {}", e))
+        .and_hms(0, 0, 0)
+        .into();
+    if DateTime::<Utc>::from_utc(time, Utc) < Utc::now() - Duration::days(2) {
+        xml = get_xml();
+        if let Ok(mut file) = File::with_options().write(true).open(path) {
+            file.write(xml.as_bytes())
+                .unwrap_or_else(|e| panic!("Error: unable to write xml to file."));
+        } else {
+            panic!("Error: unable to open file to write to.");
+        }
+    } else if cfg!(debug_assertions) {
+        println!("File is fresh");
+    }
+    currencies
 }
 
 fn get_xml() -> String {
@@ -143,6 +164,8 @@ enum ArgType {
     Amount(f64),
     Connector,
     Currency(String),
+    Help,
+    Currencies,
     Invalid,
 }
 
@@ -153,6 +176,10 @@ fn what_is(s: String) -> ArgType {
         ArgType::Connector
     } else if is_currency(&s) {
         ArgType::Currency(s.to_uppercase())
+    } else if is_help(&s) {
+        ArgType::Help
+    } else if is_currencies(&s) {
+        ArgType::Currencies
     } else {
         ArgType::Invalid
     };
@@ -167,8 +194,27 @@ fn is_connector(s: &String) -> bool {
     };
 }
 
+fn is_help(s: &String) -> bool {
+    return match s.as_str() {
+        "-h" => true,
+        "--help" => true,
+        _ => false,
+    };
+}
+
+fn is_currencies(s: &String) -> bool {
+    return match s.as_str() {
+        "-l" => true,
+        "--list" => true,
+        "-c" => true,
+        "--currencies" => true,
+        _ => false,
+    };
+}
+
 // This function dreams of being replaced by a compile time constant hashmap
 fn is_currency(s: &String) -> bool {
+    // TODO: This shouldn't be hardcoded
     return match s.to_uppercase().as_str() {
         "EUR" => true,
         "HKD" => true,
