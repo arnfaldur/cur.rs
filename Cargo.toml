@@ -1,6 +1,6 @@
 [package]
 name = "cur-rs"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2018"
 
 [[bin]]
@@ -10,6 +10,7 @@ path = "src/main.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [profile.dev]
 opt-level = 3
+debug = true
 
 [dependencies]
 attohttpc = "0.17.0"
