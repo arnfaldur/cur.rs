@@ -69,32 +69,14 @@ fn main() {
 }
 
 fn format_number(number: f64) -> String {
-    if (number >= 1e12) {
+    if number >= 1e4 {
         let mut result = format!("{:.0}", number);
-        result.insert(result.len() - 12, ',');
-        result.insert(result.len() - 9, ',');
-        result.insert(result.len() - 6, ',');
-        result.insert(result.len() - 3, ',');
+        for i in (1..=number.log(1000.0).floor() as usize).rev() {
+            result.insert(result.len() - i * 3, ',');
+        }
         return result;
-    } else if (number >= 1e9) {
-        let mut result = format!("{:.0}", number);
-        result.insert(result.len() - 9, ',');
-        result.insert(result.len() - 6, ',');
-        result.insert(result.len() - 3, ',');
-        return result;
-    } else if (number >= 1e6) {
-        let mut result = format!("{:.0}", number);
-        result.insert(result.len() - 6, ',');
-        result.insert(result.len() - 3, ',');
-        return result;
-    } else if (number >= 1e4) {
-        let mut result = format!("{:.0}", number);
-        result.insert(result.len() - 3, ',');
-        return result;
-    } else if (number >= 1e3) {
-        format!("{:.0}", number)
     } else {
-        format!("{:.2}", number)
+        return format!("{:.2}", number);
     }
 }
 
