@@ -56,13 +56,45 @@ fn main() {
             let currencies = fun_name();
 
             let other_amount = amount * currencies[currency_pair.1] / currencies[currency_pair.0];
-            println!(
-                "{:.2} {} is {:.2} {}",
-                amount, currency_pair.0, other_amount, currency_pair.1
-            );
+
+            print!("{} ", format_number(amount));
+            print!("{} is ", currency_pair.0);
+            print!("{} ", format_number(other_amount));
+            print!("{}", currency_pair.1);
+            println!("");
         } else {
             println!("cur: incorrect usage\nTry 'cur -h' for more information.");
         }
+    }
+}
+
+fn format_number(number: f64) -> String {
+    if (number >= 1e12) {
+        let mut result = format!("{:.0}", number);
+        result.insert(result.len() - 12, ',');
+        result.insert(result.len() - 9, ',');
+        result.insert(result.len() - 6, ',');
+        result.insert(result.len() - 3, ',');
+        return result;
+    } else if (number >= 1e9) {
+        let mut result = format!("{:.0}", number);
+        result.insert(result.len() - 9, ',');
+        result.insert(result.len() - 6, ',');
+        result.insert(result.len() - 3, ',');
+        return result;
+    } else if (number >= 1e6) {
+        let mut result = format!("{:.0}", number);
+        result.insert(result.len() - 6, ',');
+        result.insert(result.len() - 3, ',');
+        return result;
+    } else if (number >= 1e4) {
+        let mut result = format!("{:.0}", number);
+        result.insert(result.len() - 3, ',');
+        return result;
+    } else if (number >= 1e3) {
+        format!("{:.0}", number)
+    } else {
+        format!("{:.2}", number)
     }
 }
 
