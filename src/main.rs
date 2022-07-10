@@ -1,5 +1,4 @@
 #![allow(warnings)]
-#![feature(with_options)]
 use chrono::{DateTime, Duration, NaiveDate, Utc};
 use std::{
     collections::HashMap,
@@ -121,7 +120,7 @@ fn fun_name() -> HashMap<String, f64> {
         .into();
     if DateTime::<Utc>::from_utc(time, Utc) < Utc::now() - Duration::days(2) {
         xml = get_xml();
-        if let Ok(mut file) = File::with_options().write(true).open(path) {
+        if let Ok(mut file) = File::options().write(true).open(path) {
             file.write(xml.as_bytes())
                 .unwrap_or_else(|e| panic!("Error: unable to write xml to file."));
         } else {
