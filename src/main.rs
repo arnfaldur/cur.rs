@@ -1,5 +1,5 @@
 #![allow(warnings)]
-use chrono::{DateTime, Duration, NaiveDate, Utc};
+use chrono::{Date, DateTime, Datelike, Duration, NaiveDate, Utc, Weekday};
 use std::{
     collections::HashMap,
     env::temp_dir,
@@ -114,11 +114,17 @@ fn fun_name() -> HashMap<String, f64> {
         }
     };
     let (time, currencies) = parse_xml(xml);
-    let time = NaiveDate::parse_from_str(&time, "%Y-%m-%d")
+    let raw_date_of_data = NaiveDate::parse_from_str(&time, "%Y-%m-%d")
         .unwrap_or_else(|e| panic!("Error: unable to parse time from xml, time: {}", e))
-        .and_hms(0, 0, 0)
         .into();
-    if DateTime::<Utc>::from_utc(time, Utc) < Utc::now() - Duration::days(2) {
+    let date_of_data = Date::<Utc>::from_utc(raw_date_of_data, Utc);
+    //let date_of_data = DateTime::<Utc>::from_utc(raw_date_of_data, Utc)
+    let shift_to_weekday =
+        (Utc::today().weekday().number_from_monday() - Weekday::Fri.num_days_from_monday());
+    let adjusted_today = Utc::today() - Duration::days(shift_to_weekday.max(0).into());
+
+    if date_of_data < adjusted_today {
+        // get data if current data is older than the most recent weekday
         xml = get_xml();
         if let Ok(mut file) = File::options().write(true).open(path) {
             file.write(xml.as_bytes())
