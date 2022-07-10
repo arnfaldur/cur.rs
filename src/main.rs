@@ -1,5 +1,5 @@
 #![allow(warnings)]
-use chrono::{Date, DateTime, Datelike, Duration, NaiveDate, Utc, Weekday};
+use chrono::{Date, Datelike, Duration, NaiveDate, Utc, Weekday};
 use std::{
     collections::HashMap,
     env::temp_dir,
@@ -8,10 +8,7 @@ use std::{
 };
 
 use attohttpc::get;
-use xml::{
-    attribute::OwnedAttribute,
-    reader::{EventReader, XmlEvent},
-};
+use xml::reader::{EventReader, XmlEvent};
 
 fn main() {
     let args = std::env::args().skip(1);
