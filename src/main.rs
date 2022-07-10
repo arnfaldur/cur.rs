@@ -1,4 +1,3 @@
-#![allow(warnings)]
 use chrono::{Date, Datelike, Duration, NaiveDate, Utc, Weekday};
 use std::{
     collections::HashMap,
@@ -79,7 +78,7 @@ fn format_number(number: f64) -> String {
 fn fun_name() -> HashMap<String, f64> {
     let mut path = temp_dir();
     path.push("cur-rs-data.xml");
-    let mut file = File::open(path.clone());
+    let file = File::open(path.clone());
     let mut xml = match file {
         Ok(mut file) => {
             if cfg!(debug_assertions) {
@@ -87,12 +86,14 @@ fn fun_name() -> HashMap<String, f64> {
             }
             // check if file is up to date
             let mut xml = String::new();
-            file.read_to_string(&mut xml);
+            file.read_to_string(&mut xml).unwrap();
             xml
         }
         Err(e) => {
-            //eprintln!("File::open error: {:?}", e);
-            let mut file = File::create(path.clone());
+            if cfg!(debug_assertions) {
+                eprintln!("File::open error: {:?}", e);
+            }
+            let file = File::create(path.clone());
             match file {
                 Ok(mut file) => {
                     if cfg!(debug_assertions) {
@@ -117,7 +118,7 @@ fn fun_name() -> HashMap<String, f64> {
     let date_of_data = Date::<Utc>::from_utc(raw_date_of_data, Utc);
     //let date_of_data = DateTime::<Utc>::from_utc(raw_date_of_data, Utc)
     let shift_to_weekday =
-        (Utc::today().weekday().number_from_monday() - Weekday::Fri.num_days_from_monday());
+        Utc::today().weekday().number_from_monday() - Weekday::Fri.num_days_from_monday();
     let adjusted_today = Utc::today() - Duration::days(shift_to_weekday.max(0).into());
 
     if date_of_data < adjusted_today {
@@ -125,7 +126,7 @@ fn fun_name() -> HashMap<String, f64> {
         xml = get_xml();
         if let Ok(mut file) = File::options().write(true).open(path) {
             file.write(xml.as_bytes())
-                .unwrap_or_else(|e| panic!("Error: unable to write xml to file."));
+                .unwrap_or_else(|e| panic!("Error: unable to write xml to file. {}", e));
         } else {
             panic!("Error: unable to open file to write to.");
         }
@@ -154,7 +155,7 @@ fn parse_xml(raw_xml: String) -> (String, HashMap<String, f64>) {
             Ok(XmlEvent::StartElement {
                 name,
                 attributes,
-                namespace,
+                namespace: _,
             }) if name.local_name == "Cube" => {
                 let mut currency = None;
                 let mut rate = None;
