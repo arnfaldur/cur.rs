@@ -134,6 +134,8 @@ fn fun_name() -> HashMap<String, f64> {
 }
 
 fn get_xml() -> String {
+    // TODO: The ECB datapoint isn't reliable, instead use:
+    // https://fiscaldata.treasury.gov/datasets/treasury-reporting-rates-exchange/treasury-reporting-rates-of-exchange
     let url = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml";
     let response = get(url).send().unwrap();
     let raw_xml = response.text().unwrap();
