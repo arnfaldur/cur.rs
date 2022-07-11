@@ -117,9 +117,9 @@ fn get_currencies() -> HashMap<String, f64> {
         .into();
     let date_of_data = Date::<Utc>::from_utc(raw_date_of_data, Utc);
     //let date_of_data = DateTime::<Utc>::from_utc(raw_date_of_data, Utc)
-    let shift_to_weekday =
-        Utc::today().weekday().number_from_monday() - Weekday::Fri.num_days_from_monday();
-    let adjusted_today = Utc::today() - Duration::days(shift_to_weekday.max(0).into());
+    let shift_to_weekday: i64 = Utc::today().weekday().number_from_monday() as i64
+        - Weekday::Fri.num_days_from_monday() as i64;
+    let adjusted_today = Utc::today() - Duration::days(shift_to_weekday.max(0));
 
     if date_of_data < adjusted_today {
         // get data if current data is older than the most recent weekday
