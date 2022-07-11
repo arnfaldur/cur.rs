@@ -52,7 +52,7 @@ fn main() {
             _ => None,
         };
         if let Some((amount, currency_pair)) = correct_usage {
-            let currencies = fun_name();
+            let currencies = get_currencies();
 
             let other_amount = amount * currencies[currency_pair.1] / currencies[currency_pair.0];
 
@@ -79,7 +79,7 @@ fn format_number(number: f64) -> String {
     }
 }
 
-fn fun_name() -> HashMap<String, f64> {
+fn get_currencies() -> HashMap<String, f64> {
     let mut path = temp_dir();
     path.push("cur-rs-data.xml");
     let mut file = File::open(path.clone());
