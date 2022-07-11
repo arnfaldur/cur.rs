@@ -1,5 +1,4 @@
-#![allow(warnings)]
-use chrono::{Date, DateTime, Datelike, Duration, NaiveDate, Utc, Weekday};
+use chrono::{DateTime, Datelike, Duration, NaiveDate, Utc, Weekday};
 use std::{
     collections::HashMap,
     env::temp_dir,
@@ -8,10 +7,7 @@ use std::{
 };
 
 use attohttpc::get;
-use xml::{
-    attribute::OwnedAttribute,
-    reader::{EventReader, XmlEvent},
-};
+use xml::reader::{EventReader, XmlEvent};
 
 fn main() {
     let args = std::env::args().skip(1);
@@ -82,7 +78,7 @@ fn format_number(number: f64) -> String {
 fn get_currencies() -> HashMap<String, f64> {
     let mut path = temp_dir();
     path.push("cur-rs-data.xml");
-    let mut file = File::open(path.clone());
+    let file = File::open(path.clone());
     let mut xml = match file {
         Ok(mut file) => {
             if cfg!(debug_assertions) {
@@ -90,12 +86,14 @@ fn get_currencies() -> HashMap<String, f64> {
             }
             // check if file is up to date
             let mut xml = String::new();
-            file.read_to_string(&mut xml);
+            file.read_to_string(&mut xml).unwrap();
             xml
         }
         Err(e) => {
-            //eprintln!("File::open error: {:?}", e);
-            let mut file = File::create(path.clone());
+            if cfg!(debug_assertions) {
+                eprintln!("File::open error: {:?}", e);
+            }
+            let file = File::create(path.clone());
             match file {
                 Ok(mut file) => {
                     if cfg!(debug_assertions) {
@@ -131,7 +129,7 @@ fn get_currencies() -> HashMap<String, f64> {
         xml = get_xml();
         if let Ok(mut file) = File::options().write(true).open(path) {
             file.write(xml.as_bytes())
-                .unwrap_or_else(|e| panic!("Error: unable to write xml to file."));
+                .unwrap_or_else(|e| panic!("Error: unable to write xml to file. {}", e));
         } else {
             panic!("Error: unable to open file to write to.");
         }
@@ -160,7 +158,7 @@ fn parse_xml(raw_xml: String) -> (String, HashMap<String, f64>) {
             Ok(XmlEvent::StartElement {
                 name,
                 attributes,
-                namespace,
+                namespace: _,
             }) if name.local_name == "Cube" => {
                 let mut currency = None;
                 let mut rate = None;
