@@ -1,4 +1,3 @@
-use chrono::{Date, Datelike, Duration, NaiveDate, Utc, Weekday};
 use std::{
     collections::HashMap,
     env::temp_dir,
@@ -7,6 +6,7 @@ use std::{
 };
 
 use attohttpc::get;
+use chrono::{Date, Datelike, Duration, NaiveDate, Utc, Weekday};
 use xml::reader::{EventReader, XmlEvent};
 
 fn main() {
