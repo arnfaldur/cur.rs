@@ -220,7 +220,7 @@ enum ArgType {
 }
 
 fn what_is(s: String) -> ArgType {
-    return if let Ok(num) = s.replace("_", "").parse::<f64>() {
+    return if let Ok(num) = s.replace("_", "").replace(",", "").parse::<f64>() {
         ArgType::Amount(num)
     } else if is_connector(&s) {
         ArgType::Connector
