@@ -105,31 +105,24 @@ fn get_currencies() -> HashMap<String, f64> {
             if cfg!(debug_assertions) {
                 eprintln!("File::open error: {:?}", e);
             }
-            let file = File::create(path.clone());
-            match file {
-                Ok(mut file) => {
-                    if cfg!(debug_assertions) {
-                        println!("File not found, fetching xml and saving to file");
-                    }
-                    // get data and put in file
-                    let xml = get_xml();
-                    file.write_all(xml.as_bytes())
-                        .unwrap_or_else(|err| panic!("Unable to write to file: {}", err));
-                    xml
-                }
-                Err(e) => {
-                    panic!("Error unable to open file {}", e);
-                }
+            let mut file = File::create(path.clone()).expect("Error unable to open file");
+            if cfg!(debug_assertions) {
+                println!("File not found, fetching xml and saving to file");
             }
+            // get data and put in file
+            let xml = fetch_xml();
+            file.write_all(xml.as_bytes())
+                .expect("Unable to write to file");
+            xml
         }
     };
     let (time, currencies) = parse_xml(xml);
     let raw_date_of_data = NaiveDate::parse_from_str(&time, "%Y-%m-%d")
-        .unwrap_or_else(|e| panic!("Error: unable to parse time from xml, time: {}", e))
-        .and_hms(16 - 1, 0, 0)
+        .expect("unable to parse time from xml")
+        .and_hms_opt(16 - 1, 0, 0)
+        .expect("unable to extend date to datetime")
         .into();
     let date_of_data = DateTime::<Utc>::from_utc(raw_date_of_data, Utc);
-    //let date_of_data = DateTime::<Utc>::from_utc(raw_date_of_data, Utc)
     let shift_to_weekday = (Utc::now() - Duration::days(1))
         .weekday()
         .number_from_monday() as i64
@@ -138,20 +131,21 @@ fn get_currencies() -> HashMap<String, f64> {
 
     if date_of_data < adjusted_today {
         // get data if current data is older than the most recent weekday
-        xml = get_xml();
-        if let Ok(mut file) = File::options().write(true).open(path) {
-            file.write(xml.as_bytes())
-                .unwrap_or_else(|e| panic!("Error: unable to write xml to file. {}", e));
-        } else {
-            panic!("Error: unable to open file to write to.");
-        }
+        xml = fetch_xml();
+
+        File::options()
+            .write(true)
+            .open(path)
+            .expect("unable to open xml file to write to")
+            .write_all(xml.as_bytes())
+            .expect("unable to write xml to file");
     } else if cfg!(debug_assertions) {
         println!("File is fresh");
     }
     currencies
 }
 
-fn get_xml() -> String {
+fn fetch_xml() -> String {
     // TODO: The ECB datapoint isn't reliable, instead use:
     // https://fiscaldata.treasury.gov/datasets/treasury-reporting-rates-exchange/treasury-reporting-rates-of-exchange
     let url = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml";
