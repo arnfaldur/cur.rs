@@ -10,10 +10,17 @@ use chrono::{Date, Datelike, Duration, NaiveDate, Utc, Weekday};
 use xml::reader::{EventReader, XmlEvent};
 
 fn main() {
-    let args = std::env::args().skip(1);
-    let types: Vec<ArgType> = args.map(what_is).collect();
-
     use ArgType::*;
+    let args = std::env::args().skip(1);
+    let boi: Vec<ArgType> = args.map(what_is).collect();
+    let long_output = boi.contains(&Long);
+
+    let types: Vec<ArgType> = boi
+        .iter()
+        .filter(|arg| **arg != Long)
+        .map(|e| e.clone())
+        .collect();
+
     if let Some(Help) = types.get(0) {
         println!(concat!(
             "usage:\n",
@@ -22,6 +29,7 @@ fn main() {
             "\tcur <from currency> [connector] <to currency> [amount]\n",
             "options:\n",
             "\t-h, --help                      Print this help message\n",
+            "\t-l, --long                      Longer more human readable output\n",
             "\t-l, -c, --list, --currencies    List the available currency symbols\n",
             "connectors:\n",
             "\tas, in, to\n",
@@ -52,11 +60,15 @@ fn main() {
 
             let other_amount = amount * currencies[currency_pair.1] / currencies[currency_pair.0];
 
-            print!("{} ", format_number(amount));
-            print!("{} is ", currency_pair.0);
-            print!("{} ", format_number(other_amount));
-            print!("{}", currency_pair.1);
-            println!("");
+            if long_output {
+                print!("{} ", format_number(amount));
+                print!("{} is ", currency_pair.0);
+                print!("{} ", format_number(other_amount));
+                print!("{}", currency_pair.1);
+                println!("");
+            } else {
+                println!("{}", format_number(other_amount));
+            }
         } else {
             println!("cur: incorrect usage\nTry 'cur -h' for more information.");
         }
@@ -179,11 +191,13 @@ fn parse_xml(raw_xml: String) -> (String, HashMap<String, f64>) {
     return (time, currencies);
 }
 
+#[derive(PartialEq, Clone)]
 enum ArgType {
     Amount(f64),
     Connector,
     Currency(String),
     Help,
+    Long,
     Currencies,
     Invalid,
 }
@@ -197,10 +211,20 @@ fn what_is(s: String) -> ArgType {
         ArgType::Currency(s.to_uppercase())
     } else if is_help(&s) {
         ArgType::Help
+    } else if is_long_flag(&s) {
+        ArgType::Long
     } else if is_currencies(&s) {
         ArgType::Currencies
     } else {
         ArgType::Invalid
+    };
+}
+
+fn is_long_flag(s: &String) -> bool {
+    return match s.as_str() {
+        "-l" => true,
+        "--long" => true,
+        _ => false,
     };
 }
 
