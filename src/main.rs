@@ -6,7 +6,7 @@ use std::{
 };
 
 use attohttpc::get;
-use chrono::{Date, Datelike, Duration, NaiveDate, Utc, Weekday};
+use chrono::{DateTime, Datelike, Duration, NaiveDate, Utc, Weekday};
 use xml::reader::{EventReader, XmlEvent};
 
 fn main() {
@@ -126,12 +126,15 @@ fn get_currencies() -> HashMap<String, f64> {
     let (time, currencies) = parse_xml(xml);
     let raw_date_of_data = NaiveDate::parse_from_str(&time, "%Y-%m-%d")
         .unwrap_or_else(|e| panic!("Error: unable to parse time from xml, time: {}", e))
+        .and_hms(16 - 1, 0, 0)
         .into();
-    let date_of_data = Date::<Utc>::from_utc(raw_date_of_data, Utc);
+    let date_of_data = DateTime::<Utc>::from_utc(raw_date_of_data, Utc);
     //let date_of_data = DateTime::<Utc>::from_utc(raw_date_of_data, Utc)
-    let shift_to_weekday: i64 = Utc::today().weekday().number_from_monday() as i64
+    let shift_to_weekday = (Utc::now() - Duration::days(1))
+        .weekday()
+        .number_from_monday() as i64
         - Weekday::Fri.num_days_from_monday() as i64;
-    let adjusted_today = Utc::today() - Duration::days(shift_to_weekday.max(0));
+    let adjusted_today = Utc::now() - Duration::days(shift_to_weekday.max(0));
 
     if date_of_data < adjusted_today {
         // get data if current data is older than the most recent weekday
