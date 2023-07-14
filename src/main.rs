@@ -6,7 +6,7 @@ use std::{
 };
 
 use attohttpc::get;
-use chrono::{DateTime, Datelike, Duration, NaiveDate, Utc, Weekday};
+use chrono::{DateTime, Datelike, Duration, TimeZone, Utc, Weekday};
 use xml::reader::{EventReader, XmlEvent};
 
 fn main() {
@@ -90,59 +90,79 @@ fn format_number(number: f64) -> String {
 fn get_currencies() -> HashMap<String, f64> {
     let mut path = temp_dir();
     path.push("cur-rs-data.xml");
-    let file = File::open(path.clone());
-    let mut xml = match file {
-        Ok(mut file) => {
+    return File::options()
+        .read(true)
+        .open(path.clone())
+        .map_err(|e| {
+            if cfg!(debug_assertions) {
+                eprintln!("File::open error: {:?}", e);
+            }
+        })
+        .ok()
+        .and_then(|mut file| {
             if cfg!(debug_assertions) {
                 println!("Reading xml from file");
             }
             // check if file is up to date
             let mut xml = String::new();
-            file.read_to_string(&mut xml).unwrap();
-            xml
-        }
-        Err(e) => {
-            if cfg!(debug_assertions) {
-                eprintln!("File::open error: {:?}", e);
+            file.read_to_string(&mut xml)
+                .expect("unable to read xml into string");
+            let (time, currencies) = parse_xml(xml);
+            let fresh = is_data_fresh(Utc::now(), time.clone());
+
+            if cfg!(debug_assertions) && !fresh {
+                println!("Data is outdated {}", time);
             }
-            let mut file = File::create(path.clone()).expect("Error unable to open file");
+
+            fresh.then_some(currencies)
+        })
+        .map(|c| {
             if cfg!(debug_assertions) {
-                println!("File not found, fetching xml and saving to file");
+                println!("File is fresh");
             }
-            // get data and put in file
+            c
+        })
+        .unwrap_or_else(|| {
+            if cfg!(debug_assertions) {
+                println!("Fetching new data and writing to file");
+            }
+            // get data if current data is older than the most recent weekday
             let xml = fetch_xml();
-            file.write_all(xml.as_bytes())
-                .expect("Unable to write to file");
-            xml
-        }
-    };
-    let (time, currencies) = parse_xml(xml);
-    let raw_date_of_data = NaiveDate::parse_from_str(&time, "%Y-%m-%d")
-        .expect("unable to parse time from xml")
-        .and_hms_opt(16 - 1, 0, 0)
-        .expect("unable to extend date to datetime")
-        .into();
-    let date_of_data = DateTime::<Utc>::from_utc(raw_date_of_data, Utc);
-    let shift_to_weekday = (Utc::now() - Duration::days(1))
-        .weekday()
-        .number_from_monday() as i64
-        - Weekday::Fri.num_days_from_monday() as i64;
-    let adjusted_today = Utc::now() - Duration::days(shift_to_weekday.max(0));
 
-    if date_of_data < adjusted_today {
-        // get data if current data is older than the most recent weekday
-        xml = fetch_xml();
+            File::options()
+                .write(true)
+                .create(true)
+                .open(path)
+                .expect("unable to open xml file to write to")
+                .write_all(xml.as_bytes())
+                .expect("unable to write xml to file");
 
-        File::options()
-            .write(true)
-            .open(path)
-            .expect("unable to open xml file to write to")
-            .write_all(xml.as_bytes())
-            .expect("unable to write xml to file");
-    } else if cfg!(debug_assertions) {
-        println!("File is fresh");
+            parse_xml(xml).1
+        });
+}
+
+fn is_data_fresh(now: DateTime<Utc>, time: String) -> bool {
+    let date_of_data = Utc
+        .datetime_from_str(&(time + "T00:00:00"), "%Y-%m-%dT%H:%M:%S")
+        .expect("unable to parse time from xml");
+    if cfg!(debug_assertions) {
+        dbg!(now);
+        dbg!(date_of_data);
     }
-    currencies
+    let adjusted_now = {
+        // Data is updated at roughly 14:00 UTC we give them an extra hour
+        let midnight_centered = now - Duration::hours(15);
+        // How many days since last friday given it's a weekend?
+        let weekend_day = ((midnight_centered.weekday().num_days_from_monday() as i64)
+            - Weekday::Fri.num_days_from_monday() as i64)
+            .max(0);
+        midnight_centered - Duration::days(weekend_day)
+    };
+    if cfg!(debug_assertions) {
+        dbg!(adjusted_now);
+        eprintln!("------------------------------")
+    }
+    return date_of_data.date_naive() >= adjusted_now.date_naive();
 }
 
 fn fetch_xml() -> String {
@@ -291,4 +311,119 @@ fn is_currency(s: &String) -> bool {
         "KRW" => true,
         _ => false,
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::offset::Utc;
+    use chrono::TimeZone;
+
+    use crate::is_data_fresh;
+
+    #[test]
+    fn is_data_fresh_time_threshold_test() {
+        let pairs = vec![
+            ("2023-07-13T10:00:00", "2023-07-12"),
+            ("2023-07-13T11:00:00", "2023-07-12"),
+            ("2023-07-13T12:00:00", "2023-07-12"),
+            ("2023-07-13T13:00:00", "2023-07-12"),
+            ("2023-07-13T14:00:00", "2023-07-12"),
+            ("2023-07-13T14:59:59", "2023-07-12"),
+            ("2023-07-13T15:00:00", "2023-07-13"),
+            ("2023-07-13T16:00:00", "2023-07-13"),
+            ("2023-07-13T17:00:00", "2023-07-13"),
+            ("2023-07-13T18:00:00", "2023-07-13"),
+            ("2023-07-13T19:00:00", "2023-07-13"),
+        ];
+        for pair in pairs {
+            assert!(
+                is_data_fresh(
+                    Utc.datetime_from_str(pair.0, "%Y-%m-%dT%H:%M:%S").unwrap(),
+                    pair.1.to_string()
+                ),
+                "{} should be fresh at {}",
+                pair.1,
+                pair.0
+            );
+        }
+    }
+    #[test]
+    fn is_data_outdated_time_threshold_test() {
+        let pairs = vec![
+            ("2023-07-13T10:00:00", "2023-07-11"),
+            ("2023-07-13T11:00:00", "2023-07-11"),
+            ("2023-07-13T12:00:00", "2023-07-11"),
+            ("2023-07-13T13:00:00", "2023-07-11"),
+            ("2023-07-13T14:00:00", "2023-07-11"),
+            ("2023-07-13T14:59:59", "2023-07-11"),
+            ("2023-07-13T15:00:00", "2023-07-12"),
+            ("2023-07-13T16:00:00", "2023-07-12"),
+            ("2023-07-13T17:00:00", "2023-07-12"),
+            ("2023-07-13T18:00:00", "2023-07-12"),
+            ("2023-07-13T19:00:00", "2023-07-12"),
+        ];
+        for pair in pairs {
+            assert!(
+                !is_data_fresh(
+                    Utc.datetime_from_str(pair.0, "%Y-%m-%dT%H:%M:%S").unwrap(),
+                    pair.1.to_string()
+                ),
+                "{} should be outdated at {}",
+                pair.1,
+                pair.0
+            );
+        }
+    }
+
+    #[test]
+    fn is_data_fresh_weekend_test() {
+        let pairs = vec![
+            ("2023-07-06T13:00:00", "2023-07-05"),
+            ("2023-07-07T13:00:00", "2023-07-06"),
+            ("2023-07-08T13:00:00", "2023-07-07"),
+            ("2023-07-09T13:00:00", "2023-07-07"),
+            ("2023-07-10T13:00:00", "2023-07-07"),
+            ("2023-07-10T14:59:59", "2023-07-07"),
+            ("2023-07-10T15:00:00", "2023-07-10"),
+            ("2023-07-11T13:00:00", "2023-07-10"),
+            ("2023-07-12T13:00:00", "2023-07-11"),
+        ];
+        for pair in pairs {
+            assert!(
+                is_data_fresh(
+                    Utc.datetime_from_str(pair.0, "%Y-%m-%dT%H:%M:%S").unwrap(),
+                    pair.1.to_string()
+                ),
+                "{} should be fresh at {}",
+                pair.1,
+                pair.0
+            );
+        }
+    }
+
+    #[test]
+    fn is_data_outdated_weekend_test() {
+        let pairs = vec![
+            ("2023-07-06T13:00:00", "2023-07-04"),
+            ("2023-07-07T13:00:00", "2023-07-05"),
+            ("2023-07-08T13:00:00", "2023-07-06"),
+            ("2023-07-09T13:00:00", "2023-07-06"),
+            ("2023-07-10T13:00:00", "2023-07-06"),
+            ("2023-07-10T14:59:59", "2023-07-06"),
+            ("2023-07-10T15:00:00", "2023-07-07"),
+            ("2023-07-11T14:00:00", "2023-07-07"),
+            ("2023-07-12T14:00:00", "2023-07-10"),
+        ];
+        for pair in pairs {
+            assert!(
+                !is_data_fresh(
+                    Utc.datetime_from_str(pair.0, "%Y-%m-%dT%H:%M:%S").unwrap(),
+                    pair.1.to_string()
+                ),
+                "{} should be outdated at {}",
+                pair.1,
+                pair.0
+            );
+        }
+    }
 }

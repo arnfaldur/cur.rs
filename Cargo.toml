@@ -20,6 +20,6 @@ xml-rs = "0.8"
 #pickledb = "0.4.1"
 
 [dependencies.chrono]
-version = "0.4.19"
+version = "0.4.26"
 default-features = false
 features = [ "clock" ]
